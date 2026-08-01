@@ -1,0 +1,13 @@
+{
+  "Id": "com.icc.voice",
+  "Name": "语音播报",
+  "Version": "1.0.0",
+  "Description": "为随机抽选和快抽提供本地及在线 TTS、多音字映射、播报前奏音与后置音功能",
+  "Author": "ICC-CE",
+  "EntranceAssembly": "VoicePlugin.dll",
+  "ApiVersion": "1.0.0",
+  "MinHostVersion": "1.7.18",
+  "Url": "https://github.com/HHH2309/VoicePlugin",
+  "Permissions": [],
+  "Dependencies": []
+}

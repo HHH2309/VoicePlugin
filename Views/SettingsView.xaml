@@ -1,0 +1,791 @@
+<UserControl x:Class="VoicePlugin.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="1180" d:DesignWidth="760">
+    <UserControl.Resources>
+        <Duration x:Key="FastAnimationDuration">0:0:0.14</Duration>
+
+        <Style x:Key="SettingsCardStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="HoverCardStyle" TargetType="Border" BasedOn="{StaticResource SettingsCardStyle}">
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="0"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Opacity" Value="0.72"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="IconButtonStyle" TargetType="Button">
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                CornerRadius="4"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background"
+                                        Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="44" Height="24">
+                            <Border x:Name="Track" CornerRadius="12"
+                                    Background="#7F7F7F"/>
+                            <Ellipse x:Name="Thumb" Width="18" Height="18"
+                                     Margin="3" HorizontalAlignment="Left"
+                                     Fill="White">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform x:Name="ThumbTranslation" X="0"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTranslation"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="20" Duration="0:0:0.12">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTranslation"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="0" Duration="0:0:0.12">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                                <Setter TargetName="Track" Property="Background"
+                                        Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WarningPanelStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+            <Setter Property="Background" Value="#18FFB900"/>
+            <Setter Property="BorderBrush" Value="#66FFB900"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="-6"/>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Visibility" Value="Visible">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="1" Duration="0:0:0.14"/>
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                 To="0" Duration="0:0:0.14">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel MaxWidth="820">
+        <TextBlock Text="语音播报" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <TextBlock Text="管理抽选播报引擎、提示音和自定义读音。更改会自动保存并热生效。"
+                   Style="{StaticResource SecondaryTextStyle}" Margin="0,0,0,16"/>
+
+        <Border Style="{StaticResource HoverCardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="自动播报" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="抽选完成后自动朗读；关闭时会立即停止语音、网络合成和提示音。"
+                               Style="{StaticResource SecondaryTextStyle}"/>
+                </StackPanel>
+                <CheckBox x:Name="EnableRandomPickTtsToggle" Grid.Column="1"
+                          ToolTip="启用自动播报"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+
+                <StackPanel Grid.Row="1" Margin="0,14,16,0">
+                    <TextBlock Text="截断时通知" FontWeight="SemiBold"/>
+                    <TextBlock Text="点击“播报截断”按钮或菜单项时显示应用内通知。"
+                               Style="{StaticResource SecondaryTextStyle}"/>
+                </StackPanel>
+                <CheckBox x:Name="NotifyOnStopToggle" Grid.Row="1" Grid.Column="1"
+                          Margin="0,14,0,0"
+                          ToolTip="截断播报时显示通知"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+            </Grid>
+        </Border>
+
+        <Border Style="{StaticResource HoverCardStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="系统托盘菜单" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="在托盘图标右键菜单中显示“开启/关闭自动播报”开关；关闭后播报开关仅在设置页中操作。"
+                               Style="{StaticResource SecondaryTextStyle}"/>
+                </StackPanel>
+                <CheckBox x:Name="ShowTrayToggleToggle" Grid.Column="1"
+                          ToolTip="在系统托盘菜单中显示播报开关"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+            </Grid>
+        </Border>
+
+        <Border Style="{StaticResource HoverCardStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="全局快捷键" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="启用后在软件“快捷键设置”页中与内置快捷键一起配置组合键，任何窗口按下即截断当前播报。"
+                               Style="{StaticResource SecondaryTextStyle}"/>
+                </StackPanel>
+                <CheckBox x:Name="EnableStopHotkeyToggle" Grid.Column="1"
+                          ToolTip="启用全局热键截断播报"
+                          Style="{StaticResource ToggleSwitchStyle}"
+                          Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+            </Grid>
+        </Border>
+
+        <StackPanel x:Name="SettingsContentPanel">
+            <Border Style="{StaticResource HoverCardStyle}">
+                <StackPanel>
+                    <TextBlock Text="语音引擎" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="SAPI 是可靠的本地默认；Windows Media 使用系统本地语音，但在未打包宿主中可能因应用包身份限制而不可用；Edge 为非官方在线接口。"
+                               Style="{StaticResource SecondaryTextStyle}" Margin="0,0,0,14"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="引擎" Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="ProviderComboBox" Grid.Column="1" MinHeight="34"
+                                  DisplayMemberPath="DisplayName" SelectedValuePath="Provider"
+                                  SelectionChanged="ProviderComboBox_SelectionChanged"/>
+                    </Grid>
+
+                    <Border x:Name="EdgeWarningPanel" Style="{StaticResource WarningPanelStyle}"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Edge 在线语音（非官方）" FontWeight="SemiBold"/>
+                            <TextBlock Text="文本会发送到 Microsoft Edge 的非公开在线朗读服务。接口可能随时失效；超时或失败时可自动降级到本地引擎。"
+                                       Style="{StaticResource SecondaryTextStyle}" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock x:Name="ProviderHintText"
+                               Style="{StaticResource SecondaryTextStyle}" Margin="100,7,0,0"/>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="发音人" Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="VoiceComboBox" Grid.Column="1" MinHeight="34"
+                                  DisplayMemberPath="DisplayName" SelectedValuePath="Id"
+                                  SelectionChanged="OnSettingChanged"/>
+                        <Button x:Name="RefreshVoicesButton" Grid.Column="2"
+                                Content="刷新语音" Margin="8,0,0,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="RefreshVoicesButton_Click"/>
+                    </Grid>
+                    <TextBlock x:Name="VoiceHintText"
+                               Style="{StaticResource SecondaryTextStyle}" Margin="100,6,0,0"/>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
+                            <ColumnDefinition Width="58"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="语速" Style="{StaticResource FieldLabelStyle}"/>
+                        <Slider x:Name="RateSlider" Grid.Column="1" Minimum="-10" Maximum="10"
+                                TickFrequency="1" IsSnapToTickEnabled="True"
+                                ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=RateSlider, Path=Value, StringFormat={}{0:0}}"/>
+                        </TextBlock>
+                    </Grid>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
+                            <ColumnDefinition Width="58"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="音量" Style="{StaticResource FieldLabelStyle}"/>
+                        <Slider x:Name="VolumeSlider" Grid.Column="1" Minimum="0" Maximum="100"
+                                TickFrequency="5" IsSnapToTickEnabled="True"
+                                ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=VolumeSlider, Path=Value, StringFormat={}{0:0}}"/>
+                        </TextBlock>
+                    </Grid>
+
+                    <StackPanel x:Name="EdgeOptionsPanel" Visibility="Collapsed" Margin="0,14,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="78"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="网络超时" Style="{StaticResource FieldLabelStyle}"/>
+                            <Slider x:Name="EdgeTimeoutSlider" Grid.Column="1"
+                                    Minimum="1000" Maximum="30000" TickFrequency="1000"
+                                    IsSnapToTickEnabled="True" ValueChanged="OnSettingChanged"/>
+                            <TextBlock Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center">
+                                <Run Text="{Binding ElementName=EdgeTimeoutSlider, Path=Value, StringFormat={}{0:0}}"/>
+                                <Run Text=" ms"/>
+                            </TextBlock>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="FallbackOptionsPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="失败后降级到本地语音" FontWeight="SemiBold"/>
+                                <TextBlock Text="引擎播报失败时自动改用 Windows SAPI 本地语音。"
+                                           Style="{StaticResource SecondaryTextStyle}"/>
+                            </StackPanel>
+                            <CheckBox x:Name="EdgeFallbackToggle" Grid.Column="1"
+                                      Style="{StaticResource ToggleSwitchStyle}"
+                                      Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource HoverCardStyle}">
+                <StackPanel>
+                    <TextBlock Text="播报内容" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="使用 {name} 代表每个被抽中的姓名或学号；批量抽选会逐人套用模板。"
+                               Style="{StaticResource SecondaryTextStyle}" Margin="0,0,0,10"/>
+                    <TextBox x:Name="SpeechTemplateTextBox" MinHeight="34" MaxLength="180"
+                             VerticalContentAlignment="Center" TextChanged="OnSettingChanged"/>
+
+                    <TextBlock Text="播报延迟" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="78"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="DelaySlider" Minimum="0" Maximum="2000"
+                                TickFrequency="100" IsSnapToTickEnabled="True"
+                                ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Column="1" TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=DelaySlider, Path=Value, StringFormat={}{0:0}}"/>
+                            <Run Text=" ms"/>
+                        </TextBlock>
+                    </Grid>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="学号按单数字朗读" FontWeight="SemiBold"/>
+                            <TextBlock Text="纯数字内容会按单个数字逐字朗读；混合内容保持原样。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="SpaceNumericDigitsToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="播报示例" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <Button x:Name="PlaySampleButton" Grid.Column="1"
+                                Content="播放播报示例" Style="{StaticResource IconButtonStyle}"
+                                Click="PlaySampleButton_Click"/>
+                    </Grid>
+                    <TextBlock x:Name="PreviewText" TextWrapping="Wrap" Padding="10,8"
+                               Margin="0,8,0,0"
+                               Background="{DynamicResource ControlFillColorDefaultBrush}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource HoverCardStyle}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="播报前奏音" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="语音朗读前播放的提示音；支持 WAV、MP3 和 FLAC，播报被手动停止时会立即停止。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="CueEnabledToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid x:Name="CueOptionsPanel" Margin="0,14,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="音效文件" Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBox x:Name="CuePathTextBox" Grid.Column="1" MinHeight="34"
+                                 VerticalContentAlignment="Center" TextChanged="OnSettingChanged"/>
+                        <Button Grid.Column="2" Content="浏览…" Margin="8,0,0,0"
+                                Style="{StaticResource IconButtonStyle}" Click="BrowseCueButton_Click"/>
+
+                        <TextBlock Grid.Row="1" Text="音效后间隔" Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabelStyle}"/>
+                        <Slider x:Name="CueGapSlider" Grid.Row="1" Grid.Column="1" Margin="0,14,0,0"
+                                Minimum="0" Maximum="5000" TickFrequency="100"
+                                IsSnapToTickEnabled="True" ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,14,0,0"
+                                   MinWidth="72" TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=CueGapSlider, Path=Value, StringFormat={}{0:0}}"/>
+                            <Run Text=" ms"/>
+                        </TextBlock>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource HoverCardStyle}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="播报后置音" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="语音朗读完毕后播放的提示音；支持 WAV、MP3 和 FLAC，播报被手动停止时不会播放。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="PostCueEnabledToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid x:Name="PostCueOptionsPanel" Margin="0,14,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="音效文件" Style="{StaticResource FieldLabelStyle}"/>
+                        <TextBox x:Name="PostCuePathTextBox" Grid.Column="1" MinHeight="34"
+                                 VerticalContentAlignment="Center" TextChanged="OnSettingChanged"/>
+                        <Button Grid.Column="2" Content="浏览…" Margin="8,0,0,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="BrowsePostCueButton_Click"/>
+
+                        <TextBlock Grid.Row="1" Text="播报后间隔" Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabelStyle}"/>
+                        <Slider x:Name="PostCueGapSlider" Grid.Row="1" Grid.Column="1" Margin="0,14,0,0"
+                                Minimum="0" Maximum="5000" TickFrequency="100"
+                                IsSnapToTickEnabled="True" ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,14,0,0"
+                                   MinWidth="72" TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=PostCueGapSlider, Path=Value, StringFormat={}{0:0}}"/>
+                            <Run Text=" ms"/>
+                        </TextBlock>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource HoverCardStyle}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="播报音频缓存" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="缓存已播报的音频，重复播报秒开；缓存能减少磁盘写入，低配机型可用按日期或调小容量。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="EnableAudioCacheToggle" Grid.Column="1"
+                                  ToolTip="启用播报音频缓存"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid x:Name="AudioCacheOptionsPanel" Margin="0,14,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*" MinWidth="120"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="限制方式" Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="CacheLimitModeComboBox" Grid.Column="1" MinHeight="34"
+                                  DisplayMemberPath="Label" SelectionChanged="OnSettingChanged"/>
+
+                        <TextBlock x:Name="CacheSizeLabel" Grid.Row="1" Text="容量上限"
+                                   Margin="0,12,0,0" Style="{StaticResource FieldLabelStyle}"/>
+                        <Slider x:Name="AudioCacheSizeSlider" Grid.Row="1" Grid.Column="1" Margin="0,12,0,0"
+                                Minimum="20" Maximum="200" TickFrequency="10"
+                                IsSnapToTickEnabled="True" ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,12,0,0" MinWidth="48"
+                                   TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=AudioCacheSizeSlider, Path=Value, StringFormat={}{0:0}}"/>
+                            <Run Text=" MB"/>
+                        </TextBlock>
+
+                        <TextBlock x:Name="CacheRetentionLabel" Grid.Row="2" Text="保留天数"
+                                   Margin="0,12,0,0" Style="{StaticResource FieldLabelStyle}"/>
+                        <Slider x:Name="AudioCacheRetentionSlider" Grid.Row="2" Grid.Column="1" Margin="0,12,0,0"
+                                Minimum="1" Maximum="30" TickFrequency="1"
+                                IsSnapToTickEnabled="True" ValueChanged="OnSettingChanged"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Margin="8,12,0,0" MinWidth="48"
+                                   TextAlignment="Right" VerticalAlignment="Center">
+                            <Run Text="{Binding ElementName=AudioCacheRetentionSlider, Path=Value, StringFormat={}{0:0}}"/>
+                            <Run Text=" 天"/>
+                        </TextBlock>
+
+                        <TextBlock Grid.Row="3" Text="预缓存内容" Margin="0,12,0,0"
+                                   Style="{StaticResource FieldLabelStyle}"/>
+                        <ComboBox x:Name="PrecacheScopeComboBox" Grid.Row="3" Grid.Column="1"
+                                  Margin="0,12,0,0" MinHeight="34"
+                                  DisplayMemberPath="Label" SelectionChanged="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="启动时自动预缓存" FontWeight="SemiBold"/>
+                            <TextBlock Text="软件启动后按上方范围后台预合成播报音频；随机发音人模式下无效。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="PrecacheOnStartupToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  ToolTip="启动时自动预缓存"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button x:Name="PrecacheNowButton" Content="预缓存全部内容"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    Click="PrecacheNowButton_Click"/>
+                            <Button x:Name="ClearCacheButton" Content="清空缓存" Margin="8,0,0,0"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    Click="ClearCacheButton_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="预缓存完成提醒" FontWeight="SemiBold"/>
+                            <TextBlock Text="预缓存完成时显示应用内通知（含失败条目汇总）。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="NotifyPrecacheCompletedToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  ToolTip="预缓存完成时显示通知"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="切换名单后清除缓存" FontWeight="SemiBold"/>
+                            <TextBlock Text="名单内容变化（如换班、换学期）时自动清空缓存，避免播放旧名单的音频。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="ClearCacheOnRosterChangeToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  ToolTip="名单变更后自动清空缓存"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="缓存分析" FontWeight="SemiBold"/>
+                            <TextBlock Text="统计本会话的缓存命中率与体积，帮助判断容量设置是否合适。默认关闭。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="EnableCacheStatsToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  ToolTip="显示缓存分析"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                    </Grid>
+
+                    <StackPanel x:Name="CacheStatsPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="命中率" Foreground="{DynamicResource SecondaryTextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="CacheHitRateText" Grid.Column="1" FontFamily="Consolas"
+                                       Margin="8,0,24,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="缓存体积" Foreground="{DynamicResource SecondaryTextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="CacheSizeText" Grid.Column="3" FontFamily="Consolas"
+                                       Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="命中 / 未命中" Foreground="{DynamicResource SecondaryTextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="CacheHitMissText" Grid.Column="1" FontFamily="Consolas"
+                                       Margin="8,0,24,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="条目数 / 已服务数据" Foreground="{DynamicResource SecondaryTextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="CacheEntryText" Grid.Column="3" FontFamily="Consolas"
+                                       Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Button x:Name="RefreshCacheStatsButton" Content="刷新" Margin="0,10,0,0"
+                                HorizontalAlignment="Left" Style="{StaticResource IconButtonStyle}"
+                                Click="RefreshCacheStatsButton_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource HoverCardStyle}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock Text="自定义读音" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="按列表顺序执行区分大小写的字面量全局替换，例如“单”→“善”。"
+                                       Style="{StaticResource SecondaryTextStyle}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="EnablePronunciationsToggle" Grid.Column="1"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  VerticalAlignment="Center"
+                                  ToolTip="启用自定义读音替换"
+                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged"/>
+                        <Button x:Name="AddPronunciationButton" Grid.Column="2"
+                                Content="＋ 添加" Margin="12,0,0,0"
+                                Style="{StaticResource IconButtonStyle}"
+                                Click="AddPronunciationButton_Click"/>
+                    </Grid>
+
+                    <ListBox x:Name="PronunciationList" Margin="0,12,0,0"
+                             ItemsSource="{Binding PronunciationRules}"
+                             BorderThickness="0" Background="Transparent"
+                             SelectionMode="Single"
+                             AllowDrop="True"
+                             ToolTip="可拖动调整替换顺序（从上到下依次应用）"
+                             PreviewMouseLeftButtonDown="PronunciationList_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="PronunciationList_PreviewMouseMove"
+                             PreviewMouseLeftButtonUp="PronunciationList_PreviewMouseLeftButtonUp"
+                             Drop="PronunciationList_Drop">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background"
+                                                Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" MinWidth="90"/>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*" MinWidth="90"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding Original, UpdateSourceTrigger=PropertyChanged}"
+                                             MaxLength="80" MinHeight="32"
+                                             TextChanged="PronunciationTextBox_TextChanged"/>
+                                    <TextBlock Grid.Column="1" Text="→" FontSize="16"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="2"
+                                             Text="{Binding Replacement, UpdateSourceTrigger=PropertyChanged}"
+                                             MaxLength="120" MinHeight="32"
+                                             TextChanged="PronunciationTextBox_TextChanged"/>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="↑" Width="32" Height="32" Margin="0,0,4,0"
+                                                ToolTip="上移" Click="MovePronunciationUp_Click"/>
+                                        <Button Content="↓" Width="32" Height="32" Margin="0,0,4,0"
+                                                ToolTip="下移" Click="MovePronunciationDown_Click"/>
+                                        <Button Content="×" Width="32" Height="32"
+                                                ToolTip="删除" Click="RemovePronunciationButton_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock x:Name="EmptyPronunciationHint"
+                               Text="尚未添加自定义读音。"
+                               Style="{StaticResource SecondaryTextStyle}" Margin="4,8,0,0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <Grid Margin="0,2,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="ResetSettingsButton" Content="恢复默认设置"
+                    Style="{StaticResource IconButtonStyle}" Click="ResetSettingsButton_Click"/>
+            <TextBlock Grid.Column="1" Text="设置已自动保存并生效"
+                       Style="{StaticResource SecondaryTextStyle}"
+                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+        </Grid>
+    </StackPanel>
+</UserControl>

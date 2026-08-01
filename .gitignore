@@ -1,0 +1,22 @@
+# Build outputs
+bin/
+obj/
+icpx/
+*.icpx
+*.user
+*.suo
+
+# Legacy local artifact folders (not part of the source)
+artifacts/
+deploy/
+publish/
+publish2/
+.diagnostic-publish/
+
+# Local SDK copies (references resolve to the host repo instead)
+lib/
+
+# IDE
+.vs/
+.idea/
+*.swp

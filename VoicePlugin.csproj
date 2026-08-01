@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>VoicePlugin</AssemblyName>
+    <Version>1.0.0</Version>
+    <Deterministic>true</Deterministic>
+    <!-- 编译后自动打包 .icpx 插件包（打包目标内联自 InkCanvas.PluginSdk.targets） -->
+    <CreateIcpx>true</CreateIcpx>
+    <IcpxOutputDirectory Condition="'$(IcpxOutputDirectory)'==''">$(MSBuildProjectDirectory)\icpx</IcpxOutputDirectory>
+    <IcpxPackageName Condition="'$(IcpxPackageName)'==''">$(MSBuildProjectName).icpx</IcpxPackageName>
+    <!-- 宿主仓库根目录（用于引用 InkCanvas.PluginSdk / InkCanvas.Controls 的
+         构建产物）。本地默认指向本仓库旁的 community-net10 检出；
+         CI 可用 -p:PluginSdkRoot=../community 覆盖。 -->
+    <PluginSdkRoot Condition="'$(PluginSdkRoot)'==''">..\community-net10\community-net10</PluginSdkRoot>
+    <!-- 符号嵌入程序集，避免 .pdb 文件进入插件包 -->
+    <DebugType>embedded</DebugType>
+    <!-- 关闭 SDK 默认的 None/Content 通配收集：这些项会被注入
+         {CandidateAssemblyFiles}（优先级高于 HintPath），导致 lib/、
+         artifacts/ 等目录下遗留的旧 InkCanvas.PluginSdk/Controls 拷贝
+         抢占本 csproj 里 HintPath 指向的宿主构建产物。
+         本项目所需文件全部显式声明，不依赖默认通配。 -->
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <!-- .icpx 打包目标（与 SDK 源码仓库 InkCanvas.PluginSdk.targets 保持一致） -->
+  <Target Name="CreateIcpxPackage"
+          AfterTargets="Build"
+          Condition="'$(CreateIcpx)'=='true'">
+    <Error Condition="!Exists('$(OutputPath)manifest.json')"
+           Code="ICSDK001"
+           Text="manifest.json not found in output directory. Please add a manifest.json to your project." />
+
+    <MakeDir Directories="$(IcpxOutputDirectory)"
+             Condition="!Exists('$(IcpxOutputDirectory)')" />
+
+    <Message Text="Creating plugin package: $(IcpxOutputDirectory)\$(IcpxPackageName)" Importance="high" />
+
+    <ZipDirectory SourceDirectory="$(OutputPath)"
+                  Overwrite="true"
+                  DestinationFile="$(IcpxOutputDirectory)\$(IcpxPackageName)" />
+
+    <Message Text="Plugin package created successfully." Importance="high" />
+  </Target>
+
+  <ItemGroup>
+    <!-- EdgeTTS.DotNet 需随插件分发；不开 CopyLocalLockFileAssemblies
+         （否则 SDK/DI/WinRT 运行库也会被复制进包），这里显式从
+         NuGet 缓存复制所需的那一个程序集到输出目录。 -->
+    <None Include="$(NuGetPackageRoot)edgetts.dotnet\0.4.0\lib\net10.0\EdgeTTS.DotNet.dll"
+          Link="EdgeTTS.DotNet.dll"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 运行时宿主内嵌 SDK（含 ITrayService/ICanvasInkService 等新接口）。
+         直接引用宿主源码仓库的构建产物（与 InkCanvas.Controls 相同模式），
+         Private=false 确保宿主共享程序集不会被打进插件包；
+         运行时统一绑定宿主内嵌副本。 -->
+    <Reference Include="InkCanvas.PluginSdk">
+      <HintPath>$(PluginSdkRoot)\InkCanvas.PluginSdk\bin\Release\net10.0-windows10.0.19041.0\InkCanvas.PluginSdk.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- InkCanvas.Controls 尚未发布到当前 NuGet 源；引用本地最新宿主构建
+         仅用于编译 ToolbarImageButton/LabeledToggleSwitch/PopupShellContent。
+         Private=false 确保宿主共享控件程序集不会被打进插件包。 -->
+    <Reference Include="InkCanvas.Controls">
+      <HintPath>$(PluginSdkRoot)\InkCanvas.Controls\bin\Release\net10.0-windows10.0.19041.0\InkCanvas.Controls.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" PrivateAssets="all" />
+    <!-- EdgeTTS.DotNet 0.4.0 仅提供 net9.0/net10.0 目标，因此本插件
+         必须保持 net10.0-windows TFM（宿主为 net10，可直接加载）。 -->
+    <PackageReference Include="EdgeTTS.DotNet" Version="0.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="manifest.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
