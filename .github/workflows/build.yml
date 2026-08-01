@@ -9,19 +9,21 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
     - name: Checkout plugin
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.2
 
     - name: Checkout host source
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.2
       with:
         repository: InkCanvasForClass/community
         path: community
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5.2.0
       with:
         dotnet-version: '10.0.x'
 
@@ -44,7 +46,7 @@ jobs:
         dotnet build VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=community
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: VoicePlugin
         path: icpx/VoicePlugin.icpx
