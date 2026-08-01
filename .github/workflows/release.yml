@@ -41,7 +41,7 @@ jobs:
     - name: Build plugin
       shell: pwsh
       run: |
-        dotnet build VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=../community
+        dotnet build VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=community
 
     - name: Package .icpx
       shell: pwsh
@@ -52,7 +52,8 @@ jobs:
         Write-Host "Packaged packages/$pluginId.icpx"
 
     - name: Create Release
+      env:
+        RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       shell: pwsh
       run: |
-        $tag = if ("$env:GITHUB_REF_TYPE" -eq "tag") { $env:GITHUB_REF_NAME } else { "$env:GITHUB_REF_NAME" }
-        gh release create "$tag" "packages/*.icpx" --repo $env:GITHUB_REPOSITORY --title "$tag" --generate-notes
+        gh release create "$env:RELEASE_TAG" "packages/*.icpx" --repo $env:GITHUB_REPOSITORY --title "$env:RELEASE_TAG" --generate-notes

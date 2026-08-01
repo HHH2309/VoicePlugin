@@ -25,6 +25,11 @@
          本项目所需文件全部显式声明，不依赖默认通配。 -->
     <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <!-- 同样关闭 Compile/Page 默认通配：CI 会把宿主源码检出到本仓库
+         工作区内的 community/ 子目录（供 SDK/Controls 构建），若不关闭，
+         宿主整棵树会被当作插件源码编译。编译项在下方显式声明。 -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
   </PropertyGroup>
 
   <!-- .icpx 打包目标（与 SDK 源码仓库 InkCanvas.PluginSdk.targets 保持一致） -->
@@ -80,6 +85,15 @@
 
   <ItemGroup>
     <None Include="manifest.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- 插件源码显式声明（默认通配已关闭，见上方 EnableDefaultCompileItems）。 -->
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Compile Include="Config\*.cs" />
+    <Compile Include="Services\*.cs" />
+    <Compile Include="Views\*.cs" />
+    <Page Include="Views\SettingsView.xaml" />
   </ItemGroup>
 
 </Project>
