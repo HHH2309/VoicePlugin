@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout plugin
+      uses: actions/checkout@v4
+
+    - name: Checkout host source
+      uses: actions/checkout@v4
+      with:
+        repository: InkCanvasForClass/community
+        path: community
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Build host SDK & controls
+      shell: pwsh
+      run: |
+        dotnet build community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj --configuration Release
+        dotnet build community/InkCanvas.Controls/InkCanvas.Controls.csproj --configuration Release
+
+    - name: Build plugin
+      shell: pwsh
+      run: |
+        dotnet build VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=../community
+
+    - name: Package .icpx
+      shell: pwsh
+      run: |
+        $pluginId = (Get-Content "bin/Release/net10.0-windows10.0.19041.0/manifest.json" | ConvertFrom-Json).Id
+        New-Item -ItemType Directory -Path packages -Force | Out-Null
+        Copy-Item "icpx/VoicePlugin.icpx" "packages/$pluginId.icpx" -Force
+        Write-Host "Packaged packages/$pluginId.icpx"
+
+    - name: Create Release
+      shell: pwsh
+      run: |
+        $tag = if ("$env:GITHUB_REF_TYPE" -eq "tag") { $env:GITHUB_REF_NAME } else { "$env:GITHUB_REF_NAME" }
+        gh release create "$tag" "packages/*.icpx" --repo $env:GITHUB_REPOSITORY --title "$tag" --generate-notes
