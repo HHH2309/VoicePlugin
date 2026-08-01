@@ -25,11 +25,14 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Build host SDK & controls
+    # 上游社区仓库仍为 net6.0 目标；本插件 TFM 为 net10.0-windows
+    # （EdgeTTS.DotNet 0.4.0 仅提供 net9/net10 目标），因此宿主
+    # SDK/控件需按 net10.0 重新构建，产物路径与插件 HintPath 对齐。
+    - name: Build host SDK & controls (net10.0)
       shell: pwsh
       run: |
-        dotnet build community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj --configuration Release
-        dotnet build community/InkCanvas.Controls/InkCanvas.Controls.csproj --configuration Release
+        dotnet build community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj --configuration Release -p:TargetFramework=net10.0-windows10.0.19041.0
+        dotnet build community/InkCanvas.Controls/InkCanvas.Controls.csproj --configuration Release -p:TargetFramework=net10.0-windows10.0.19041.0
 
     - name: Build plugin
       shell: pwsh

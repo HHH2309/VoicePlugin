@@ -78,8 +78,11 @@ PluginConfigs/com.icc.voice/voice_config.json
 ```powershell
 git clone https://github.com/InkCanvasForClass/community community-net10
 
-dotnet build community-net10\community-net10\InkCanvas.PluginSdk\InkCanvas.PluginSdk.csproj -c Release
-dotnet build community-net10\community-net10\InkCanvas.Controls\InkCanvas.Controls.csproj -c Release
+# 上游社区仓库仍为 net6.0 目标；本插件 TFM 为 net10.0-windows
+# （EdgeTTS.DotNet 0.4.0 仅提供 net9/net10 目标），因此宿主
+# SDK/控件需按 net10.0 重新构建。
+dotnet build community-net10\community-net10\InkCanvas.PluginSdk\InkCanvas.PluginSdk.csproj -c Release -p:TargetFramework=net10.0-windows10.0.19041.0
+dotnet build community-net10\community-net10\InkCanvas.Controls\InkCanvas.Controls.csproj -c Release -p:TargetFramework=net10.0-windows10.0.19041.0
 
 dotnet build VoicePlugin.csproj -c Release
 ```
