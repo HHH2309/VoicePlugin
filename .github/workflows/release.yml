@@ -61,10 +61,12 @@ jobs:
         Write-Host "Packaged packages/$pluginId.icpx"
 
     - name: Create Release
+      # gh 在 Actions 环境中必须显式提供 GH_TOKEN，否则直接报错退出。
+      env:
+        GH_TOKEN: ${{ github.token }}
       shell: pwsh
       run: |
         $pluginId = (Get-Content "bin/Release/net10.0-windows10.0.19041.0/manifest.json" | ConvertFrom-Json).Id
         $tag = "${{ inputs.tag || github.ref_name }}"
-        # 显式传入资产路径（不用通配符），说明文字用静态 notes
-        # （--generate-notes 在部分场景下会调用失败导致整个步骤退出）。
+        # 显式传入资产路径（不用通配符），说明文字用静态 notes。
         gh release create "$tag" "packages/$pluginId.icpx" --repo $env:GITHUB_REPOSITORY --title "$tag" --notes "Voice 插件自动构建包 ($tag)"
