@@ -155,6 +155,11 @@ namespace VoicePlugin
                 // 预缓存执行器：手动按钮与启动自动预缓存共用。
                 // 与缓存对象一样始终创建；运行时会自查缓存开关（IsEnabled），
                 // 关闭时直接跳过，因此无需按启动时的开关分叉。
+                var nameRosters = GetService<INameRosterService>();
+                if (nameRosters != null)
+                {
+                    Log("[Voice] using the host INameRosterService for roster reads.");
+                }
                 _precacheService = new PrecacheService(
                     _audioCache,
                     _providers,
@@ -166,7 +171,8 @@ namespace VoicePlugin
                     Log,
                     LogError,
                     (title, message, level) =>
-                        _notificationService?.Show(title, message, level));
+                        _notificationService?.Show(title, message, level),
+                    nameRosters);
 
                 // 启动时检测名单变更（开启“切换名单后清除缓存”时清空旧缓存）。
                 _precacheService.CheckRosterChange();

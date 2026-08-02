@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Ink_Canvas.Plugins;
 using VoicePlugin.Config;
 
 namespace VoicePlugin.Services
@@ -85,9 +86,29 @@ namespace VoicePlugin.Services
             }
         }
 
-        /// <summary>读取当前名单（应用 Replace 规则、去空、去重），无名单时返回空。</summary>
-        public static IReadOnlyList<string> GetCandidateNames()
+        /// <summary>
+        /// 读取当前名单（应用 Replace 规则、去空、去重），无名单时返回空。
+        /// 传入宿主 <see cref="INameRosterService"/> 时经官方接口读取
+        /// （与宿主「随机点名」共用同一存储）；服务不可用或读取失败时
+        /// 回退为直接读 Names.txt / Replace.txt。
+        /// </summary>
+        public static IReadOnlyList<string> GetCandidateNames(
+            INameRosterService rosterService = null)
         {
+            if (rosterService != null)
+            {
+                try
+                {
+                    var (namesContent, replaceContent) = rosterService.ReadCurrentFiles();
+                    var replaces = ReadReplaceRules(SplitLines(replaceContent));
+                    return ApplyRules(SplitLines(namesContent), replaces);
+                }
+                catch (Exception)
+                {
+                    // 服务读取失败：回退到直接读文件。
+                }
+            }
+
             try
             {
                 if (!File.Exists(NamesFilePath)) return Array.Empty<string>();
@@ -111,11 +132,12 @@ namespace VoicePlugin.Services
             VoiceConfigSnapshot config,
             VoiceTextFormatter formatter,
             PrecacheScopeMode scope,
-            string rosterGuid)
+            string rosterGuid,
+            INameRosterService rosterService = null)
         {
             if (config == null || formatter == null) return Array.Empty<string>();
 
-            var candidates = ResolveCandidates(scope, rosterGuid);
+            var candidates = ResolveCandidates(scope, rosterGuid, rosterService);
             if (candidates.Count == 0)
             {
                 // 无名单：随机数 1-60。
@@ -133,17 +155,30 @@ namespace VoicePlugin.Services
                 .ToArray();
         }
 
-        /// <summary>当前启用名单内容的指纹（Names.txt + Replace.txt 全文哈希），用于名单变更检测。</summary>
-        public static string GetActiveRosterFingerprint()
+        /// <summary>
+        /// 当前启用名单内容的指纹（Names.txt + Replace.txt 全文哈希），用于名单变更检测。
+        /// 传入宿主 <see cref="INameRosterService"/> 时经官方接口读取，失败回退文件直读。
+        /// </summary>
+        public static string GetActiveRosterFingerprint(
+            INameRosterService rosterService = null)
         {
             try
             {
-                var names = File.Exists(NamesFilePath)
-                    ? File.ReadAllText(NamesFilePath)
-                    : string.Empty;
-                var replaces = File.Exists(ReplaceFilePath)
-                    ? File.ReadAllText(ReplaceFilePath)
-                    : string.Empty;
+                string names;
+                string replaces;
+                if (rosterService != null)
+                {
+                    (names, replaces) = rosterService.ReadCurrentFiles();
+                }
+                else
+                {
+                    names = File.Exists(NamesFilePath)
+                        ? File.ReadAllText(NamesFilePath)
+                        : string.Empty;
+                    replaces = File.Exists(ReplaceFilePath)
+                        ? File.ReadAllText(ReplaceFilePath)
+                        : string.Empty;
+                }
                 using var sha = SHA256.Create();
                 var bytes = sha.ComputeHash(
                     Encoding.UTF8.GetBytes(names + "" + replaces));
@@ -162,7 +197,8 @@ namespace VoicePlugin.Services
 
         private static List<string> ResolveCandidates(
             PrecacheScopeMode scope,
-            string rosterGuid)
+            string rosterGuid,
+            INameRosterService rosterService = null)
         {
             switch (scope)
             {
@@ -188,7 +224,7 @@ namespace VoicePlugin.Services
 
                 default:
                     // 当前启用名单（Names.txt / Replace.txt）。
-                    return GetCandidateNames().ToList();
+                    return GetCandidateNames(rosterService).ToList();
             }
         }
 
