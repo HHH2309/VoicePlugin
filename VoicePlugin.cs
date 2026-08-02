@@ -44,6 +44,7 @@ namespace VoicePlugin
         private TrayMenuComponent _trayMenuComponent;
         private MoreMenuComponent _moreMenuComponent;
         private AutomationActionComponent _automationActions;
+        private UriRouteComponent _uriRoutes;
         private CancellationTokenSource _activeSample;
         private object _eventServiceInstance;
         private EventInfo _randomPickCompletedEvent;
@@ -209,6 +210,28 @@ namespace VoicePlugin
                     LogError);
                 _trayMenuComponent.Install();
 
+                // URI 路由：icc://plugin/voice/speak|stop|sfx|settings|toggle-mute。
+                // 依赖宿主 IPluginUriService（新 SDK 提供），旧宿主没有该服务时
+                // 静默降级，URI 功能不可用但不影响其它功能。
+                var uriService = GetService<IPluginUriService>();
+                if (uriService != null)
+                {
+                    _uriRoutes = new UriRouteComponent(
+                        uriService,
+                        GetConfig,
+                        ApplyConfigAsync,
+                        StopSpeaking,
+                        EnqueueUriSpeechText,
+                        PlayUriSfxAsync,
+                        Log,
+                        LogError);
+                    _uriRoutes.Install();
+                }
+                else
+                {
+                    Log("[Voice] the host does not provide URI routing; icc://plugin/voice/ routes are unavailable.");
+                }
+
                 if (migrated)
                 {
                     // 观察写任务的结果，避免 SaveAfterDelayAsync 写失败时
@@ -302,6 +325,9 @@ namespace VoicePlugin
             {
                 LogError("[Voice] failed to unregister the automation items.", ex);
             }
+
+            // URI 处理器由宿主在插件卸载时自动注销，这里仅清引用。
+            _uriRoutes = null;
 
             var precache = _precacheService;
             _precacheService = null;
@@ -929,6 +955,52 @@ namespace VoicePlugin
                 voiceId,
                 VoiceConfigSnapshot.RandomVoiceId,
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// URI speak：直接播报一段文本（经播报队列，遵守打断抢占、发音词典与
+        /// “自动播报”开关；播报延迟按当前配置生效，不套播报模板）。
+        /// </summary>
+        private void EnqueueUriSpeechText(string text)
+        {
+            lock (_stateGate)
+            {
+                if (_isShuttingDown || !GetConfig().Enabled)
+                {
+                    Log("[Voice] URI speak ignored because the announcement switch is off.");
+                    return;
+                }
+
+                var queue = _voiceQueue;
+                if (queue == null)
+                {
+                    LogError("[Voice] URI speak failed because the speech queue is unavailable.", null);
+                    return;
+                }
+
+                queue.EnqueueLatest(new SpeechBatchRequest(new[] { text }, GetConfig()));
+            }
+        }
+
+        /// <summary>
+        /// URI sfx：独立播放一个音效文件（不经播报队列；
+        /// 点按“播报截断”会经共享播放服务一并停止它）。
+        /// </summary>
+        private async Task PlayUriSfxAsync(string path)
+        {
+            try
+            {
+                var playback = _audioPlayback;
+                if (playback == null) return;
+
+                var cuePlayer = new PreSpeechCuePlayer(playback, Log, LogError);
+                await cuePlayer.PlayAsync(path, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LogError("[Voice] URI sfx playback failed.", ex);
+            }
         }
 
         private void DisposeVoiceResources()
