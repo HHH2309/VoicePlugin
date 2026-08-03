@@ -96,23 +96,15 @@ namespace VoicePlugin
                     _audioCache,
                     Log,
                     LogError);
-                // Edge 在线引擎仅在 net10 构建包含（WITH_EDGE_TTS，依赖
-                // EdgeTTS.DotNet 无 net6 目标）；net6 构建不注册该引擎，
-                // TtsProviderManager 对其自动显示“该引擎未加载。”，
-                // 播报请求按既有容错逻辑自动降级到 WinRT/SAPI。
-#if WITH_EDGE_TTS
+                // Edge 在线引擎：手搓协议实现（原生 WebSocket，无第三方依赖），
+                // 非官方接口，失败时按既有容错逻辑自动降级到 WinRT/SAPI。
                 var edge = new EdgeOnlineTtsProvider(
                     _audioPlayback,
                     _audioCache,
                     Log,
                     LogError);
-#endif
                 _providers = new TtsProviderManager(
-#if WITH_EDGE_TTS
                     new ITtsProvider[] { sapi, winRt, edge },
-#else
-                    new ITtsProvider[] { sapi, winRt },
-#endif
                     Log,
                     LogError);
 

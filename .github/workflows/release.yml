@@ -25,28 +25,47 @@ jobs:
       cancel-in-progress: false
 
     steps:
-    - name: Checkout plugin
+    # 双包发布：
+    #  - com.icc.voice.icpx      = net6 版（源码 = 当前触发 ref，net6 维护线，
+    #                              面向宿主 v1.7.19.9，SDK 无新接口）
+    #  - net10com.icc.voice.icpx = net10 版（源码 = main 分支，net10 代码不动，
+    #                              面向 net10 宿主，含 Edge 在线引擎）
+    - name: Checkout plugin (net6, current ref)
       uses: actions/checkout@v6.0.2
+      with:
+        path: plugin
 
-    - name: Checkout host source
+    - name: Checkout plugin main (net10)
+      uses: actions/checkout@v6.0.2
+      with:
+        ref: main
+        path: plugin-main
+
+    # net6 版依赖宿主 v1.7.19.9 SDK（固定发布 tag）；
+    # net10 版依赖宿主 main 分支 SDK（按 net10.0 TFM 覆盖构建）。
+    - name: Checkout host source (v1.7.19.9)
       uses: actions/checkout@v6.0.2
       with:
         repository: InkCanvasForClass/community
-        # 固定宿主发布版本：本分支面向 v1.7.19.9（SDK 无新接口，
-        # 插件代码已按该 SDK 降级）；main 分支 SDK 含新接口，不能直接混用。
         ref: '1.7.19.9'
         path: community
+
+    - name: Checkout host source (main)
+      uses: actions/checkout@v6.0.2
+      with:
+        repository: InkCanvasForClass/community
+        path: community-main
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5.2.0
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: |
+          6.0.x
+          10.0.x
 
-    # 本插件 TFM 为 net6.0-windows（对齐上游社区仓库的 net6.0 目标；
-    # EdgeTTS 在线引擎在 net6 下未打包，依赖其的 EdgeTTS.DotNet 无 net6 目标）。
-    # 宿主 SDK/控件显式按 net6.0 重新构建，产物路径与插件 HintPath 对齐。
+    # ---------- net6 版（宿主 v1.7.19.9，net6.0 TFM） ----------
     # 注意：隐式 restore 不保证继承命令行 TFM 覆盖，必须显式 restore。
-    - name: Build host SDK & controls (net6.0)
+    - name: Build host SDK & controls (v1.7.19.9, net6.0)
       shell: pwsh
       run: |
         $tfm = "net6.0-windows10.0.19041.0"
@@ -55,35 +74,47 @@ jobs:
         dotnet restore community/InkCanvas.Controls/InkCanvas.Controls.csproj -p:TargetFramework=$tfm
         dotnet build community/InkCanvas.Controls/InkCanvas.Controls.csproj --configuration Release --no-restore -p:TargetFramework=$tfm
 
-    - name: Build plugin
+    - name: Build net6 plugin & package
       shell: pwsh
       run: |
-        dotnet build VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=community
-
-    - name: Package .icpx
-      shell: pwsh
-      run: |
-        $pluginId = (Get-Content "bin/Release/net6.0-windows10.0.19041.0/manifest.json" | ConvertFrom-Json).Id
+        dotnet build plugin/VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=../community
         New-Item -ItemType Directory -Path packages -Force | Out-Null
-        Copy-Item "icpx/VoicePlugin.icpx" "packages/$pluginId.icpx" -Force
-        Write-Host "Packaged packages/$pluginId.icpx"
+        Copy-Item "plugin/icpx/VoicePlugin.icpx" "packages/com.icc.voice.icpx" -Force
 
-    - name: Create Release
+    # ---------- net10 版（宿主 main 分支 SDK，net10.0 TFM） ----------
+    - name: Build host SDK & controls (main, net10.0)
+      shell: pwsh
+      run: |
+        $tfm = "net10.0-windows10.0.19041.0"
+        dotnet restore community-main/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj -p:TargetFramework=$tfm
+        dotnet build community-main/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj --configuration Release --no-restore -p:TargetFramework=$tfm
+        dotnet restore community-main/InkCanvas.Controls/InkCanvas.Controls.csproj -p:TargetFramework=$tfm
+        dotnet build community-main/InkCanvas.Controls/InkCanvas.Controls.csproj --configuration Release --no-restore -p:TargetFramework=$tfm
+
+    - name: Build net10 plugin & package
+      shell: pwsh
+      run: |
+        dotnet build plugin-main/VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=../community-main
+        Copy-Item "plugin-main/icpx/VoicePlugin.icpx" "packages/net10com.icc.voice.icpx" -Force
+        Get-ChildItem packages | Select-Object Name, Length
+
+    # ---------- 发布：幂等更新或创建 Release ----------
+    - name: Create or Update Release
       # gh 在 Actions 环境中必须显式提供 GH_TOKEN，否则直接报错退出。
-      # 同一 tag 重复发布时幂等处理：Release 已存在则用 upload --clobber
+      # 同一 tag 重复发布时幂等处理：Release 已存在则 upload --clobber
       # 覆盖同名资产（保留标题/说明），不存在才创建——避免
       # "release assets name has already been taken" 报错。
       env:
         GH_TOKEN: ${{ github.token }}
       shell: pwsh
       run: |
-        $pluginId = (Get-Content "bin/Release/net6.0-windows10.0.19041.0/manifest.json" | ConvertFrom-Json).Id
         $tag = "${{ inputs.tag || github.ref_name }}"
-        $asset = "packages/$pluginId.icpx"
+        $assets = @("packages/com.icc.voice.icpx", "packages/net10com.icc.voice.icpx")
         $existing = gh release view "$tag" --repo $env:GITHUB_REPOSITORY --json tagName --jq .tagName 2>$null
         if ($LASTEXITCODE -eq 0 -and $existing) {
-            gh release upload "$tag" "$asset" --repo $env:GITHUB_REPOSITORY --clobber
-            Write-Host "Release $tag already exists; updated asset $asset."
+            gh release upload "$tag" $assets --repo $env:GITHUB_REPOSITORY --clobber
+            Write-Host "Release $tag already exists; updated assets."
         } else {
-            gh release create "$tag" "$asset" --repo $env:GITHUB_REPOSITORY --title "$tag" --notes "Voice 插件自动构建包 ($tag)"
+            gh release create "$tag" --repo $env:GITHUB_REPOSITORY --title "$tag" --notes "Voice 插件自动构建包 ($tag)"
+            gh release upload "$tag" $assets --repo $env:GITHUB_REPOSITORY --clobber
         }

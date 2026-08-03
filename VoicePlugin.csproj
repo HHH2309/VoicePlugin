@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net6.0-windows 对齐上游宿主（InkCanvasForClass/community 仍为 net6.0 目标）。
+    <!-- net6.0-windows 对齐上游宿主（InkCanvasForClass/community v1.7.19.9 为 net6.0 目标）。
          保留 10.0.19041.0 Windows SDK 版本：WinRT 引擎需要 Windows SDK 投影。
-         注意：EdgeTTS.DotNet 无 net6 兼容版本（全部版本仅提供 net9/net10 目标），
-         net6 构建下 Edge 在线引擎被排除（见下方 WITH_EDGE_TTS 条件与
-         EdgeOnlineTtsProvider.cs 排除项），仅保留 SAPI/WinRT 双引擎。 -->
+         Edge 在线引擎为手搓协议实现（EdgeOnlineTtsProvider.cs，原生 WebSocket，
+         无第三方依赖），SAPI/WinRT/Edge 三引擎完整可用。 -->
     <TargetFramework>net6.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -13,9 +12,6 @@
     <AssemblyName>VoicePlugin</AssemblyName>
     <Version>1.0.0</Version>
     <Deterministic>true</Deterministic>
-    <!-- 仅 net10 构建包含 EdgeTTS 在线引擎（含包引用与源码编译）；
-         net6 构建不定义该符号，VoicePlugin.cs 中注册逻辑相应条件化。 -->
-    <DefineConstants Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'">$(DefineConstants);WITH_EDGE_TTS</DefineConstants>
     <!-- 编译后自动打包 .icpx 插件包（打包目标内联自 InkCanvas.PluginSdk.targets） -->
     <CreateIcpx>true</CreateIcpx>
     <IcpxOutputDirectory Condition="'$(IcpxOutputDirectory)'==''">$(MSBuildProjectDirectory)\icpx</IcpxOutputDirectory>
@@ -63,16 +59,6 @@
   </Target>
 
   <ItemGroup>
-    <!-- EdgeTTS.DotNet 需随插件分发；不开 CopyLocalLockFileAssemblies
-         （否则 SDK/DI/WinRT 运行库也会被复制进包），这里显式从
-         NuGet 缓存复制所需的那一个程序集到输出目录。 -->
-    <None Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'"
-          Include="$(NuGetPackageRoot)edgetts.dotnet\0.4.0\lib\net10.0\EdgeTTS.DotNet.dll"
-          Link="EdgeTTS.DotNet.dll"
-          CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- 运行时宿主内嵌 SDK（含 ITrayService/ICanvasInkService 等新接口）。
          直接引用宿主源码仓库的构建产物（与 InkCanvas.Controls 相同模式），
          Private=false 确保宿主共享程序集不会被打进插件包；
@@ -89,11 +75,7 @@
       <Private>false</Private>
     </Reference>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" PrivateAssets="all" />
-    <!-- EdgeTTS.DotNet 0.4.0 仅提供 net9.0/net10.0 目标（无 net6 兼容版本），
-         因此仅 net10 构建引用；net6 构建排除 Edge 在线引擎（SAPI/WinRT 不受影响，
-         设置页自动显示“该引擎未加载”，播报请求自动降级到本地引擎）。 -->
-    <PackageReference Condition="'$(TargetFramework)' == 'net10.0-windows10.0.19041.0'"
-                       Include="EdgeTTS.DotNet" Version="0.4.0" />
+    <!-- Edge 在线引擎为手搓协议实现（原生 WebSocket，无第三方依赖）。 -->
   </ItemGroup>
 
   <ItemGroup>
@@ -109,11 +91,5 @@
     <Page Include="Views\SettingsView.xaml" />
   </ItemGroup>
 
-  <!-- net6 构建排除 Edge 在线引擎源码（其依赖 EdgeTTS.DotNet 无 net6 目标）：
-       TtsProviderManager 对未注册引擎自动返回“该引擎未加载。”的不可用状态，
-       播报请求会自动降级到 WinRT/SAPI，无需改动其余代码。 -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0-windows10.0.19041.0'">
-    <Compile Remove="Services\EdgeOnlineTtsProvider.cs" />
-  </ItemGroup>
 
 </Project>
