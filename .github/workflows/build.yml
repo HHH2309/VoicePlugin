@@ -20,21 +20,24 @@ jobs:
       uses: actions/checkout@v6.0.2
       with:
         repository: InkCanvasForClass/community
+        # 固定宿主发布版本：本分支面向 v1.7.19.9（SDK 无新接口，
+        # 插件代码已按该 SDK 降级）；main 分支 SDK 含新接口，不能直接混用。
+        ref: '1.7.19.9'
         path: community
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5.2.0
       with:
-        dotnet-version: '10.0.x'
+        dotnet-version: '6.0.x'
 
-    # 上游社区仓库仍为 net6.0 目标；本插件 TFM 为 net10.0-windows
-    # （EdgeTTS.DotNet 0.4.0 仅提供 net9/net10 目标），因此宿主
-    # SDK/控件需按 net10.0 重新构建，产物路径与插件 HintPath 对齐。
+    # 本插件 TFM 为 net6.0-windows（对齐上游社区仓库的 net6.0 目标；
+    # EdgeTTS 在线引擎在 net6 下未打包，依赖其的 EdgeTTS.DotNet 无 net6 目标）。
+    # 宿主 SDK/控件显式按 net6.0 重新构建，产物路径与插件 HintPath 对齐。
     # 注意：隐式 restore 不保证继承命令行 TFM 覆盖，必须显式 restore。
-    - name: Build host SDK & controls (net10.0)
+    - name: Build host SDK & controls (net6.0)
       shell: pwsh
       run: |
-        $tfm = "net10.0-windows10.0.19041.0"
+        $tfm = "net6.0-windows10.0.19041.0"
         dotnet restore community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj -p:TargetFramework=$tfm
         dotnet build community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj --configuration Release --no-restore -p:TargetFramework=$tfm
         dotnet restore community/InkCanvas.Controls/InkCanvas.Controls.csproj -p:TargetFramework=$tfm

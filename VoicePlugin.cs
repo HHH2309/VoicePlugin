@@ -44,7 +44,6 @@ namespace VoicePlugin
         private TrayMenuComponent _trayMenuComponent;
         private MoreMenuComponent _moreMenuComponent;
         private AutomationActionComponent _automationActions;
-        private UriRouteComponent _uriRoutes;
         private CancellationTokenSource _activeSample;
         private object _eventServiceInstance;
         private EventInfo _randomPickCompletedEvent;
@@ -97,13 +96,23 @@ namespace VoicePlugin
                     _audioCache,
                     Log,
                     LogError);
+                // Edge 在线引擎仅在 net10 构建包含（WITH_EDGE_TTS，依赖
+                // EdgeTTS.DotNet 无 net6 目标）；net6 构建不注册该引擎，
+                // TtsProviderManager 对其自动显示“该引擎未加载。”，
+                // 播报请求按既有容错逻辑自动降级到 WinRT/SAPI。
+#if WITH_EDGE_TTS
                 var edge = new EdgeOnlineTtsProvider(
                     _audioPlayback,
                     _audioCache,
                     Log,
                     LogError);
+#endif
                 _providers = new TtsProviderManager(
+#if WITH_EDGE_TTS
                     new ITtsProvider[] { sapi, winRt, edge },
+#else
+                    new ITtsProvider[] { sapi, winRt },
+#endif
                     Log,
                     LogError);
 
@@ -155,11 +164,6 @@ namespace VoicePlugin
                 // 预缓存执行器：手动按钮与启动自动预缓存共用。
                 // 与缓存对象一样始终创建；运行时会自查缓存开关（IsEnabled），
                 // 关闭时直接跳过，因此无需按启动时的开关分叉。
-                var nameRosters = GetService<INameRosterService>();
-                if (nameRosters != null)
-                {
-                    Log("[Voice] using the host INameRosterService for roster reads.");
-                }
                 _precacheService = new PrecacheService(
                     _audioCache,
                     _providers,
@@ -171,8 +175,7 @@ namespace VoicePlugin
                     Log,
                     LogError,
                     (title, message, level) =>
-                        _notificationService?.Show(title, message, level),
-                    nameRosters);
+                        _notificationService?.Show(title, message, level));
 
                 // 启动时检测名单变更（开启“切换名单后清除缓存”时清空旧缓存）。
                 _precacheService.CheckRosterChange();
@@ -183,10 +186,10 @@ namespace VoicePlugin
                     _precacheService.StartPrecache();
                 }
 
-                // 白板工具栏组件通过官方 SDK 注册（RegisterBoardToolbarItem）。
-                // 注意顺序：白板先于浮动注册，首次启动时白板组件才会被
-                // 自动追加进白板配置（.toolbar_registered 标记由先注册者写入）。
-                RegisterBoardToolbarItems(host);
+                // 浮动工具栏组件通过官方 SDK 注册（RegisterToolbarItem）。
+                // 注：宿主 v1.7.19.9 的 SDK 无 RegisterBoardToolbarItem
+                // （白板工具栏 API 为后续版本新增），白板控制栏的播报截断
+                // 在旧宿主上不可用，仅注册浮动工具栏。
                 RegisterToolbarItems(host);
 
                 // “更多/工具”菜单组件：把“播报截断”注册进宿主菜单设置项，
@@ -216,28 +219,8 @@ namespace VoicePlugin
                     LogError);
                 _trayMenuComponent.Install();
 
-                // URI 路由：icc://plugin/voice/speak|stop|sfx|settings|toggle-mute。
-                // 依赖宿主 IPluginUriService（新 SDK 提供），旧宿主没有该服务时
-                // 静默降级，URI 功能不可用但不影响其它功能。
-                var uriService = GetService<IPluginUriService>();
-                if (uriService != null)
-                {
-                    _uriRoutes = new UriRouteComponent(
-                        uriService,
-                        GetConfig,
-                        ApplyConfigAsync,
-                        StopSpeaking,
-                        EnqueueUriSpeechText,
-                        PlayUriSfxAsync,
-                        Log,
-                        LogError);
-                    _uriRoutes.Install();
-                }
-                else
-                {
-                    Log("[Voice] the host does not provide URI routing; icc://plugin/voice/ routes are unavailable.");
-                }
-
+                // 注：宿主 v1.7.19.9 的 SDK 无 IPluginUriService，
+                // icc://plugin/voice/* URI 路由在新版宿主才可用，旧宿主上不可用。
                 if (migrated)
                 {
                     // 观察写任务的结果，避免 SaveAfterDelayAsync 写失败时
@@ -332,9 +315,6 @@ namespace VoicePlugin
                 LogError("[Voice] failed to unregister the automation items.", ex);
             }
 
-            // URI 处理器由宿主在插件卸载时自动注销，这里仅清引用。
-            _uriRoutes = null;
-
             var precache = _precacheService;
             _precacheService = null;
             try
@@ -424,39 +404,6 @@ namespace VoicePlugin
         private void OnSpeakingStateChanged(bool speaking)
         {
             _automationActions?.NotifySpeakingStateChanged();
-        }
-
-        private void RegisterBoardToolbarItems(IPluginHost host)
-        {
-            try
-            {
-                host.RegisterBoardToolbarItem(new PluginToolbarItemInfo
-                {
-                    Id = "voice.stop",
-                    DisplayName = "播报截断",
-                    Description = "单击立即截断（停止）当前正在播放的语音并清空待播队列",
-                    IconGeometry = VoiceIconCatalog.StopIconGeometry,
-                    ViewFactory = CreateBoardToolbarButton
-                });
-            }
-            catch (Exception ex)
-            {
-                LogError("[Voice] failed to register board toolbar controls.", ex);
-            }
-        }
-
-        private BoardToolbarButton CreateBoardToolbarButton()
-        {
-            var button = new BoardToolbarButton
-            {
-                Label = "播报截断",
-                IconGeometry = VoiceIconCatalog.StopIconGeometry,
-                Position = ButtonPosition.Single,
-                Tag = "VoicePlugin"
-            };
-            button.ToolTip = "单击：截断（停止）当前播报";
-            button.ButtonMouseUp += (sender, args) => StopSpeaking();
-            return button;
         }
 
         private void RegisterToolbarItems(IPluginHost host)
@@ -961,52 +908,6 @@ namespace VoicePlugin
                 voiceId,
                 VoiceConfigSnapshot.RandomVoiceId,
                 StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// URI speak：直接播报一段文本（经播报队列，遵守打断抢占、发音词典与
-        /// “自动播报”开关；播报延迟按当前配置生效，不套播报模板）。
-        /// </summary>
-        private void EnqueueUriSpeechText(string text)
-        {
-            lock (_stateGate)
-            {
-                if (_isShuttingDown || !GetConfig().Enabled)
-                {
-                    Log("[Voice] URI speak ignored because the announcement switch is off.");
-                    return;
-                }
-
-                var queue = _voiceQueue;
-                if (queue == null)
-                {
-                    LogError("[Voice] URI speak failed because the speech queue is unavailable.", null);
-                    return;
-                }
-
-                queue.EnqueueLatest(new SpeechBatchRequest(new[] { text }, GetConfig()));
-            }
-        }
-
-        /// <summary>
-        /// URI sfx：独立播放一个音效文件（不经播报队列；
-        /// 点按“播报截断”会经共享播放服务一并停止它）。
-        /// </summary>
-        private async Task PlayUriSfxAsync(string path)
-        {
-            try
-            {
-                var playback = _audioPlayback;
-                if (playback == null) return;
-
-                var cuePlayer = new PreSpeechCuePlayer(playback, Log, LogError);
-                await cuePlayer.PlayAsync(path, CancellationToken.None)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                LogError("[Voice] URI sfx playback failed.", ex);
-            }
         }
 
         private void DisposeVoiceResources()

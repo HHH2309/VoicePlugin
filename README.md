@@ -75,16 +75,18 @@ PluginConfigs/com.icc.voice/voice_config.json
 
 ## 构建
 
-需要 Windows 和 .NET 10 SDK，以及宿主源码检出（用于构建 `InkCanvas.PluginSdk` 与 `InkCanvas.Controls`）：
+需要 Windows 和 .NET 6 SDK，以及宿主源码检出（用于构建 `InkCanvas.PluginSdk` 与 `InkCanvas.Controls`）：
 
 ```powershell
-git clone https://github.com/InkCanvasForClass/community community-net10
+git clone --branch 1.7.19.9 https://github.com/InkCanvasForClass/community community-1.7.19.9
 
-# 上游社区仓库仍为 net6.0 目标；本插件 TFM 为 net10.0-windows
-# （EdgeTTS.DotNet 0.4.0 仅提供 net9/net10 目标），因此宿主
-# SDK/控件需按 net10.0 重新构建。
-dotnet build community-net10\community-net10\InkCanvas.PluginSdk\InkCanvas.PluginSdk.csproj -c Release -p:TargetFramework=net10.0-windows10.0.19041.0
-dotnet build community-net10\community-net10\InkCanvas.Controls\InkCanvas.Controls.csproj -c Release -p:TargetFramework=net10.0-windows10.0.19041.0
+# 本分支面向宿主 v1.7.19.9（TFM net6.0-windows，SDK 无 INameRosterService /
+# IPluginUriService / RegisterBoardToolbarItem，插件已按该 SDK 降级：
+# URI 路由与白板工具栏不可用，名单读取走 Names.txt 文件直读）；
+# EdgeTTS 在线引擎在 net6 下未打包（EdgeTTS.DotNet 无 net6 目标），
+# 播报自动使用 SAPI/WinRT 本地引擎。
+dotnet build community-1.7.19.9\InkCanvas.PluginSdk\InkCanvas.PluginSdk.csproj -c Release -p:TargetFramework=net6.0-windows10.0.19041.0
+dotnet build community-1.7.19.9\InkCanvas.Controls\InkCanvas.Controls.csproj -c Release -p:TargetFramework=net6.0-windows10.0.19041.0
 
 dotnet build VoicePlugin.csproj -c Release
 ```

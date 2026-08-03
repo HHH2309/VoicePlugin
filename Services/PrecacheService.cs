@@ -30,7 +30,6 @@ namespace VoicePlugin.Services
 
         private readonly object _gate = new object();
         private readonly string _rosterFingerprintPath;
-        private readonly INameRosterService _nameRosters;
         private CancellationTokenSource _activeRun;
         private int _generation;
 
@@ -42,8 +41,7 @@ namespace VoicePlugin.Services
             string rosterFingerprintPath,
             Action<string> log,
             Action<string, Exception> logError,
-            Action<string, string, Ink_Canvas.Plugins.NotificationLevel> notify,
-            INameRosterService nameRosters = null)
+            Action<string, string, Ink_Canvas.Plugins.NotificationLevel> notify)
         {
             _cache = cache;
             _providers = providers;
@@ -53,9 +51,6 @@ namespace VoicePlugin.Services
             _log = log;
             _logError = logError;
             _notify = notify;
-            // 宿主 INameRosterService（新 SDK 提供）：名单读取经官方接口，
-            // 旧宿主没有该服务时为 null，回落文件直读。
-            _nameRosters = nameRosters;
         }
 
         /// <summary>启动预缓存（后台执行；正在运行则取消旧任务后重启）。</summary>
@@ -88,8 +83,7 @@ namespace VoicePlugin.Services
                 var config = _getConfig();
                 if (config == null || !config.ClearCacheOnRosterChange) return;
 
-                var fingerprint = PrecacheTextProvider.GetActiveRosterFingerprint(
-                    _nameRosters);
+                var fingerprint = PrecacheTextProvider.GetActiveRosterFingerprint();
                 if (string.IsNullOrEmpty(fingerprint)) return;
 
                 var stored = string.Empty;
@@ -183,8 +177,7 @@ namespace VoicePlugin.Services
                     config,
                     _formatter,
                     config.PrecacheScope,
-                    config.PrecacheRosterGuid,
-                    _nameRosters);
+                    config.PrecacheRosterGuid);
                 if (texts.Count == 0)
                 {
                     _log?.Invoke("[Voice] precache skipped because no speech texts were derived.");
