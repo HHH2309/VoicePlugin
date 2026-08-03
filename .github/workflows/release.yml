@@ -18,6 +18,11 @@ jobs:
       contents: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    # 同一 tag 的多次触发（push tag 与手动 dispatch 并发）排队执行，
+    # 避免两个 job 同时创建同一 Release 造成资产名冲突。
+    concurrency:
+      group: release-${{ inputs.tag || github.ref_name }}
+      cancel-in-progress: false
 
     steps:
     - name: Checkout plugin
@@ -65,11 +70,20 @@ jobs:
 
     - name: Create Release
       # gh 在 Actions 环境中必须显式提供 GH_TOKEN，否则直接报错退出。
+      # 同一 tag 重复发布时幂等处理：Release 已存在则用 upload --clobber
+      # 覆盖同名资产（保留标题/说明），不存在才创建——避免
+      # "release assets name has already been taken" 报错。
       env:
         GH_TOKEN: ${{ github.token }}
       shell: pwsh
       run: |
         $pluginId = (Get-Content "bin/Release/net6.0-windows10.0.19041.0/manifest.json" | ConvertFrom-Json).Id
         $tag = "${{ inputs.tag || github.ref_name }}"
-        # 显式传入资产路径（不用通配符），说明文字用静态 notes。
-        gh release create "$tag" "packages/$pluginId.icpx" --repo $env:GITHUB_REPOSITORY --title "$tag" --notes "Voice 插件自动构建包 ($tag)"
+        $asset = "packages/$pluginId.icpx"
+        $existing = gh release view "$tag" --repo $env:GITHUB_REPOSITORY --json tagName --jq .tagName 2>$null
+        if ($LASTEXITCODE -eq 0 -and $existing) {
+            gh release upload "$tag" "$asset" --repo $env:GITHUB_REPOSITORY --clobber
+            Write-Host "Release $tag already exists; updated asset $asset."
+        } else {
+            gh release create "$tag" "$asset" --repo $env:GITHUB_REPOSITORY --title "$tag" --notes "Voice 插件自动构建包 ($tag)"
+        }
