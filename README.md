@@ -2,7 +2,6 @@
 
 ICC-CE 插件，用于随机抽选 / 快抽完成后自动语音播报被抽中的姓名或学号，支持多 TTS 引擎、自定义播报模板、提示音与课堂流程自动化。
 
-**压力CJK以获得.NET10迁移！！！**
 
 **本插件代码含有大量VibeCoding成分，介意请无视该项目**
 
@@ -77,7 +76,7 @@ PluginConfigs/com.icc.voice/voice_config.json
 
 ## 构建
 
-需要 Windows 和 .NET 10 SDK，以及宿主源码检出（用于构建 `InkCanvas.PluginSdk` 与 `InkCanvas.Controls`）：
+需要 Windows 和 .NET 6 SDK，以及宿主源码检出（用于构建 `InkCanvas.PluginSdk` 与 `InkCanvas.Controls`）：
 
 ```powershell
 git clone https://github.com/InkCanvasForClass/community community-net10
