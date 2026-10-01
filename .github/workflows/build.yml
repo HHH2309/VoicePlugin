@@ -16,34 +16,17 @@ jobs:
     - name: Checkout plugin
       uses: actions/checkout@v6.0.2
 
-    - name: Checkout host source
-      uses: actions/checkout@v6.0.2
-      with:
-        repository: InkCanvasForClass/community
-        path: community
-
     - name: Setup .NET
       uses: actions/setup-dotnet@v5.2.0
       with:
         dotnet-version: '10.0.x'
 
-    # 上游社区仓库仍为 net6.0 目标；本插件 TFM 为 net10.0-windows
-    # （EdgeTTS.DotNet 0.4.0 仅提供 net9/net10 目标），因此宿主
-    # SDK/控件需按 net10.0 重新构建，产物路径与插件 HintPath 对齐。
-    # 注意：隐式 restore 不保证继承命令行 TFM 覆盖，必须显式 restore。
-    - name: Build host SDK & controls (net10.0)
-      shell: pwsh
-      run: |
-        $tfm = "net10.0-windows10.0.19041.0"
-        dotnet restore community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj -p:TargetFramework=$tfm
-        dotnet build community/InkCanvas.PluginSdk/InkCanvas.PluginSdk.csproj --configuration Release --no-restore -p:TargetFramework=$tfm
-        dotnet restore community/InkCanvas.Controls/InkCanvas.Controls.csproj -p:TargetFramework=$tfm
-        dotnet build community/InkCanvas.Controls/InkCanvas.Controls.csproj --configuration Release --no-restore -p:TargetFramework=$tfm
-
+    # InkCanvas.PluginSdk / InkCanvas.Controls 由 NuGet 提供（已是
+    # net10.0-windows 目标），无需再检出并重编宿主源码。
     - name: Build plugin
       shell: pwsh
       run: |
-        dotnet build VoicePlugin.csproj --configuration Release -p:PluginSdkRoot=community
+        dotnet build VoicePlugin.csproj --configuration Release
 
     - name: Upload artifact
       uses: actions/upload-artifact@v7.0.1

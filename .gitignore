@@ -13,7 +13,7 @@ publish/
 publish2/
 .diagnostic-publish/
 
-# Local SDK copies (references resolve to the host repo instead)
+# 本地 SDK 副本（SDK/控件已改为 NuGet 引用，这里只防止旧副本被误提交）
 lib/
 
 # IDE
