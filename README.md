@@ -18,6 +18,8 @@ ICC-CE 插件，用于随机抽选 / 快抽完成后自动语音播报被抽中�
 - 自定义读音：多音字 / 生僻字字面量替换规则，支持拖拽排序，最多 100 条。
 - 提示音：语音朗读前的前奏音与朗读后的后置音，支持 WAV / MP3 / FLAC，受全局打断机制控制。
 - 多入口截断：白板工具栏与浮动工具栏「播报截断」按钮、「更多 / 工具」菜单项、全局热键（在宿主「快捷键设置」页内配置组合键）。
+  - 「播报截断」组件只登记进工具栏**组件库**，不会自动出现在浮动栏或白板工具栏上；需要时在宿主「工具栏设置」页里自行添加。
+  - 「更多 / 工具」菜单项同理，要在宿主「菜单设置」页里自行添加。注意该页每个菜单上限 9 项，而浮动栏「更多」与白板「工具」菜单的默认布局都已经是 9 项，需要先移除一项才有位置。
 - 系统托盘：托盘右键菜单提供「自动播报」开关。
 - 课堂自动化：向宿主自动化引擎注册 4 个行动（切换引擎 / 音色、调整语速、调整播报模板、开启 / 关闭自动播报）与 2 条规则（TTS 播报中、当前 TTS 引擎）。
 - 播报音频缓存：按引擎、发音人、语速、音量、文本缓存已合成音频，重复播报秒开；支持按容量 LRU / 按保留天数 / 不限制三种策略。
@@ -35,7 +37,7 @@ ICC-CE 插件，用于随机抽选 / 快抽完成后自动语音播报被抽中�
    - 按需添加自定义读音规则。
    - 为朗读前后的提示音选择音频文件（WAV / MP3 / FLAC）。
    - 按需配置播报音频缓存与预缓存范围。
-4. 播报进行中，可通过白板 / 浮动工具栏的「播报截断」按钮、菜单项或全局热键立即停止。
+4. 播报进行中，可通过「播报截断」按钮、菜单项或全局热键立即停止。按钮默认不在工具栏上，需先在宿主「工具栏设置」页从组件库中添加（浮动栏与白板工具栏各有一个同名组件）。
 5. 在宿主「快捷键设置」页中可配置「截断播报」全局热键的组合键。
 6. 课堂自动化：在宿主自动化工作流中添加插件的行动与规则，实现按课堂流程控制播报。
 
@@ -74,23 +76,21 @@ PluginConfigs/com.icc.voice/voice_config.json
 
 插件不声明额外权限（`Permissions: []`），所有功能均通过宿主插件 SDK 接口与系统 API 实现。
 
+## 兼容性
+
+需要 ICC-CE **1.8.0.8 或更高版本**（`InkCanvas.PluginSdk` API 1.13.0）。插件不做向后兼容，低于该版本的宿主会拒绝加载并在插件管理器中说明原因。
+
 ## 构建
 
-需要 Windows 和 .NET 6 SDK，以及宿主源码检出（用于构建 `InkCanvas.PluginSdk` 与 `InkCanvas.Controls`）：
+需要 Windows 和 .NET 10 SDK。`InkCanvas.PluginSdk` 与 `InkCanvas.Controls` 直接从 NuGet 引用（已是 `net10.0-windows` 目标），无需检出或构建宿主源码：
 
 ```powershell
-git clone https://github.com/InkCanvasForClass/community community-net10
-
-# 上游社区仓库仍为 net6.0 目标；本插件 TFM 为 net10.0-windows
-# （EdgeTTS.DotNet 0.4.0 仅提供 net9/net10 目标），因此宿主
-# SDK/控件需按 net10.0 重新构建。
-dotnet build community-net10\community-net10\InkCanvas.PluginSdk\InkCanvas.PluginSdk.csproj -c Release -p:TargetFramework=net10.0-windows10.0.19041.0
-dotnet build community-net10\community-net10\InkCanvas.Controls\InkCanvas.Controls.csproj -c Release -p:TargetFramework=net10.0-windows10.0.19041.0
-
 dotnet build VoicePlugin.csproj -c Release
 ```
 
-宿主检出在其他路径时，用 `-p:PluginSdkRoot=<宿主仓库根>` 覆盖引用位置。
+产物为 `icpx/VoicePlugin.icpx`。
+
+升级宿主 SDK 时，同步修改 `VoicePlugin.csproj` 里两个 `PackageReference` 的版本号，以及 `manifest.json` 的 `ApiVersion` / `MinHostVersion`。
 
 GitHub Actions 支持推送 `v*` 标签或手动运行工作流，并自动构建、打包和发布 `.icpx` 文件。
 
