@@ -82,6 +82,76 @@ namespace VoicePlugin.Views
 
         public ObservableCollection<PronunciationRuleRow> PronunciationRules { get; }
 
+        /// <summary>
+        /// 本页自带滚动容器（SettingsScrollHost）。宿主在插件设置页外层还有一层
+        /// ScrollViewer 时，本容器会被按无限高测量、ScrollableHeight 恒为 0；
+        /// 而 WPF 的 ScrollViewer 只要收到滚轮就无条件把事件标记为已处理
+        /// （不区分自己是否真能滚动），会把宿主那层的滚动一并吃掉。
+        /// 因此在预览阶段拦截：本容器滚不动时，把滚轮转交给上层的滚动容器。
+        /// </summary>
+        private void SettingsScrollHost_PreviewMouseWheel(
+            object sender,
+            MouseWheelEventArgs e)
+        {
+            if (e.Handled || SettingsScrollHost == null) return;
+            if (SettingsScrollHost.ScrollableHeight > 0) return;
+
+            var outer = FindAncestorScrollViewer();
+            if (outer == null) return;
+
+            e.Handled = true;
+            outer.RaiseEvent(new MouseWheelEventArgs(
+                e.MouseDevice,
+                e.Timestamp,
+                e.Delta)
+            {
+                RoutedEvent = MouseWheelEvent,
+                Source = outer
+            });
+        }
+
+        private void SettingsScrollHost_Loaded(object sender, RoutedEventArgs e)
+        {
+            UpdateScrollHostPanningMode();
+        }
+
+        private void SettingsScrollHost_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            UpdateScrollHostPanningMode();
+        }
+
+        /// <summary>
+        /// 宿主会用 SettingsWindow.ApplySmoothScrollingToPage 把触摸平移模式统一写到
+        /// 页面里所有 ScrollViewer 上；而 WPF 判断是否接管触摸平移时只看触点是否在
+        /// 视口内（ShouldManipulateScroll），不看自己是否真能滚动。本容器滚不动时
+        /// 若仍保留 VerticalOnly，就会抢先接管触摸平移却滚不动任何东西，把宿主那层
+        /// 的触摸滚动一并吃掉——与滚轮同理，所以按“能否滚动”决定要不要参与。
+        /// </summary>
+        private void UpdateScrollHostPanningMode()
+        {
+            if (SettingsScrollHost == null) return;
+
+            var mode = SettingsScrollHost.ScrollableHeight > 0
+                ? PanningMode.VerticalOnly
+                : PanningMode.None;
+            if (SettingsScrollHost.PanningMode != mode)
+            {
+                SettingsScrollHost.PanningMode = mode;
+            }
+        }
+
+        /// <summary>向上查找宿主提供的滚动容器（跳过本页自己那层）。</summary>
+        private ScrollViewer FindAncestorScrollViewer()
+        {
+            var current = VisualTreeHelper.GetParent(this);
+            while (current != null)
+            {
+                if (current is ScrollViewer scrollViewer) return scrollViewer;
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+
         private void LoadSettings()
         {
             var config = _getConfig();
