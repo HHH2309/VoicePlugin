@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +23,12 @@ namespace VoicePlugin
         private const string ConfigFileName = "voice_config.json";
         private const string LegacyConfigFileName = "voice_config.ini";
         private const string RollCallHistoryFileName = "RollCallHistory.json";
+        private const string ToolbarItemId = "voice.stop";
+        private const string ToolbarItemDisplayName = "播报截断";
+        private const string ToolbarItemDescription =
+            "单击立即截断（停止）当前正在播放的语音并清空待播队列";
+        // 宿主用插件目录下该标记判断“是否首次注册工具栏项”。
+        private const string ToolbarRegisteredMarkerFileName = ".toolbar_registered";
         private const int HistoryPollIntervalMilliseconds = 300;
         private const int StartupHistoryGracePeriodMilliseconds = 2000;
 
@@ -46,9 +51,6 @@ namespace VoicePlugin
         private AutomationActionComponent _automationActions;
         private UriRouteComponent _uriRoutes;
         private CancellationTokenSource _activeSample;
-        private object _eventServiceInstance;
-        private EventInfo _randomPickCompletedEvent;
-        private Delegate _randomPickCompletedHandler;
         private Timer _historyPollTimer;
         private string _rollCallHistoryPath;
         private List<string> _knownHistory = new List<string>();
@@ -183,10 +185,9 @@ namespace VoicePlugin
                     _precacheService.StartPrecache();
                 }
 
-                // 白板工具栏组件通过官方 SDK 注册（RegisterBoardToolbarItem）。
-                // 注意顺序：白板先于浮动注册，首次启动时白板组件才会被
-                // 自动追加进白板配置（.toolbar_registered 标记由先注册者写入）。
-                RegisterBoardToolbarItems(host);
+                // 工具栏组件只登记进宿主的“组件库”，由用户在工具栏设置页自行
+                // 添加，不自动写进浮动/白板工具栏配置（详见 SuppressToolbarAutoAdd）。
+                SuppressToolbarAutoAdd();
                 RegisterToolbarItems(host);
 
                 // “更多/工具”菜单组件：把“播报截断”注册进宿主菜单设置项，
@@ -217,8 +218,8 @@ namespace VoicePlugin
                 _trayMenuComponent.Install();
 
                 // URI 路由：icc://plugin/voice/speak|stop|sfx|settings|toggle-mute。
-                // 依赖宿主 IPluginUriService（新 SDK 提供），旧宿主没有该服务时
-                // 静默降级，URI 功能不可用但不影响其它功能。
+                // 宿主未注册 IPluginUriService 时静默跳过，URI 功能不可用
+                // 但不影响其它功能。
                 var uriService = GetService<IPluginUriService>();
                 if (uriService != null)
                 {
@@ -251,14 +252,8 @@ namespace VoicePlugin
                             TaskScheduler.Default);
                 }
 
-                if (TrySubscribeToRandomPickEvent())
-                {
-                    Log("[Voice] initialized; subscribed to the host random-pick event.");
-                    return;
-                }
-
                 StartHistoryMonitor();
-                Log("[Voice] initialized; using roll-call history monitoring compatibility mode.");
+                Log("[Voice] initialized; monitoring the roll-call history file.");
             }
             catch (Exception ex)
             {
@@ -426,22 +421,80 @@ namespace VoicePlugin
             _automationActions?.NotifySpeakingStateChanged();
         }
 
-        private void RegisterBoardToolbarItems(IPluginHost host)
+        /// <summary>
+        /// 往插件目录写 .toolbar_registered 标记，使宿主的“首次注册自动追加”
+        /// 逻辑判定为非首次：组件只登记进组件库，不会被自动写进用户的
+        /// 浮动/白板工具栏配置（宿主 PluginManager.IsFirstToolbarRegistration
+        /// 依据该标记判断，且它只在首次注册成功后立刻写入、插件卸载时删除，
+        /// 所以每次启动都要重新写）。
+        /// 写入失败时静默降级为宿主默认行为，不影响其它功能。
+        /// </summary>
+        private void SuppressToolbarAutoAdd()
         {
             try
             {
-                host.RegisterBoardToolbarItem(new PluginToolbarItemInfo
+                var folder = PluginFolder;
+                if (string.IsNullOrWhiteSpace(folder))
                 {
-                    Id = "voice.stop",
-                    DisplayName = "播报截断",
-                    Description = "单击立即截断（停止）当前正在播放的语音并清空待播队列",
+                    folder = Path.GetDirectoryName(
+                        typeof(VoicePlugin).Assembly.Location);
+                }
+
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                {
+                    Log("[Voice] the plugin folder could not be resolved; the toolbar items may be auto-added.");
+                    return;
+                }
+
+                File.WriteAllText(
+                    Path.Combine(folder, ToolbarRegisteredMarkerFileName),
+                    DateTimeOffset.UtcNow.ToString("O"));
+            }
+            catch (Exception ex)
+            {
+                LogError("[Voice] failed to suppress the toolbar auto-add.", ex);
+            }
+        }
+
+        /// <summary>
+        /// 注册“播报截断”组件到两个工具栏的组件库。目标工具栏由
+        /// <see cref="PluginToolbarItemInfo.Surface"/> 决定（SDK 统一入口；
+        /// RegisterBoardToolbarItem 已降级为旧版兼容接口）。是否自动加入
+        /// 用户配置由 <see cref="SuppressToolbarAutoAdd"/> 在注册前决定。
+        /// </summary>
+        private void RegisterToolbarItems(IPluginHost host)
+        {
+            RegisterToolbarItem(host, PluginToolbarSurface.Floating, CreateToolbarButton, true);
+            RegisterToolbarItem(host, PluginToolbarSurface.Whiteboard, CreateBoardToolbarButton, false);
+        }
+
+        private void RegisterToolbarItem(
+            IPluginHost host,
+            PluginToolbarSurface surface,
+            Func<FrameworkElement> viewFactory,
+            bool applyOrientation)
+        {
+            try
+            {
+                host.RegisterToolbarItem(new PluginToolbarItemInfo
+                {
+                    Id = ToolbarItemId,
+                    Surface = surface,
+                    DisplayName = ToolbarItemDisplayName,
+                    Description = ToolbarItemDescription,
                     IconGeometry = VoiceIconCatalog.StopIconGeometry,
-                    ViewFactory = CreateBoardToolbarButton
+                    ViewFactory = viewFactory,
+                    // 只有浮动工具栏需要在横竖排切换时调整视图。
+                    ApplyOrientation = applyOrientation
+                        ? ApplyToolbarOrientation
+                        : (Action<FrameworkElement, Orientation>)null
                 });
             }
             catch (Exception ex)
             {
-                LogError("[Voice] failed to register board toolbar controls.", ex);
+                LogError(
+                    $"[Voice] failed to register the {surface} toolbar item.",
+                    ex);
             }
         }
 
@@ -457,26 +510,6 @@ namespace VoicePlugin
             button.ToolTip = "单击：截断（停止）当前播报";
             button.ButtonMouseUp += (sender, args) => StopSpeaking();
             return button;
-        }
-
-        private void RegisterToolbarItems(IPluginHost host)
-        {
-            try
-            {
-                host.RegisterToolbarItem(new PluginToolbarItemInfo
-                {
-                    Id = "voice.stop",
-                    DisplayName = "播报截断",
-                    Description = "单击立即截断（停止）当前正在播放的语音并清空待播队列",
-                    IconGeometry = VoiceIconCatalog.StopIconGeometry,
-                    ViewFactory = CreateToolbarButton,
-                    ApplyOrientation = ApplyToolbarOrientation
-                });
-            }
-            catch (Exception ex)
-            {
-                LogError("[Voice] failed to register toolbar controls.", ex);
-            }
         }
 
         private ToolbarImageButton CreateToolbarButton()
@@ -613,46 +646,10 @@ namespace VoicePlugin
         }
 
         /// <summary>
-        /// 尝试直接订阅宿主的“抽选完成”事件。
-        /// 注意：当前宿主版本（community-net10 源码 IEventService）并未提供
-        /// RandomPickCompleted 事件，本路径总是返回 false，实际走历史文件
-        /// 监控兼容模式；保留此分支仅为适配未来宿主版本新增事件的情况。
+        /// 启动抽选结果监控：轮询宿主的 <c>Configs/RollCallHistory.json</c>，
+        /// 从历史记录的新增部分得到抽选结果。宿主与 SDK 均未提供“抽选完成”
+        /// 事件（<c>IEventService</c> 里没有对应成员），这是唯一的接入方式。
         /// </summary>
-        private bool TrySubscribeToRandomPickEvent()
-        {
-            try
-            {
-                var eventService = GetService<IEventService>();
-                if (eventService == null) return false;
-
-                var eventInfo = eventService.GetType().GetEvent(
-                    "RandomPickCompleted",
-                    BindingFlags.Instance | BindingFlags.Public);
-                if (eventInfo == null || eventInfo.EventHandlerType == null) return false;
-
-                var handlerMethod = GetType().GetMethod(
-                    nameof(OnRandomPickCompleted),
-                    BindingFlags.Instance | BindingFlags.NonPublic);
-                var handler = Delegate.CreateDelegate(
-                    eventInfo.EventHandlerType,
-                    this,
-                    handlerMethod,
-                    false);
-                if (handler == null) return false;
-
-                eventInfo.AddEventHandler(eventService, handler);
-                _eventServiceInstance = eventService;
-                _randomPickCompletedEvent = eventInfo;
-                _randomPickCompletedHandler = handler;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                LogError("[Voice] could not subscribe to the optional host random-pick event.", ex);
-                return false;
-            }
-        }
-
         private void StartHistoryMonitor()
         {
             _rollCallHistoryPath = Path.Combine(
@@ -1036,25 +1033,6 @@ namespace VoicePlugin
             {
                 LogError("[Voice] failed to stop history monitoring.", ex);
             }
-
-            if (_randomPickCompletedEvent != null
-                && _randomPickCompletedHandler != null)
-            {
-                try
-                {
-                    _randomPickCompletedEvent.RemoveEventHandler(
-                        _eventServiceInstance,
-                        _randomPickCompletedHandler);
-                }
-                catch (Exception ex)
-                {
-                    LogError("[Voice] failed to unsubscribe from the host random-pick event.", ex);
-                }
-            }
-
-            _eventServiceInstance = null;
-            _randomPickCompletedEvent = null;
-            _randomPickCompletedHandler = null;
 
             var queue = _voiceQueue;
             var providers = _providers;

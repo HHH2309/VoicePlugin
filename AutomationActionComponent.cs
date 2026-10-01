@@ -274,41 +274,102 @@ namespace VoicePlugin
                 BindingFlags.Public | BindingFlags.Instance)?.GetValue(service);
         }
 
+        /// <summary>
+        /// 注册一个行动。每一项独立兜异常：宿主内部结构变化时只丢出问题的那一项，
+        /// 不会让后面的行动与规则一起注册不上。
+        /// </summary>
         private void RegisterAction(
             string id,
             string name,
             Type settingsType,
             string handlerMethodName)
         {
-            var registryType = FindType(ActionRegistryInfoTypeName);
-            if (registryType == null)
+            try
             {
-                _log?.Invoke("[Voice] the host automation registry was not found; automation actions are unavailable.");
-                return;
+                var registryType = FindType(ActionRegistryInfoTypeName);
+                if (registryType == null)
+                {
+                    _log?.Invoke("[Voice] the host automation registry was not found; automation actions are unavailable.");
+                    return;
+                }
+
+                var actions = GetStaticDictionary(ActionServiceTypeName, "Actions");
+                if (actions == null || actions.Contains(id)) return;
+
+                var info = Activator.CreateInstance(
+                    registryType,
+                    new object[] { id, name, "CogOutline" });
+                if (info == null) return;
+
+                // SettingsType 为 null 的条目会让宿主的自动化设置页拿不到设置类，
+                // 属于坏数据：写不进去就整项放弃，不要留在注册表里。
+                if (!TrySetSettingsType(info, registryType, settingsType, id)) return;
+
+                var handleDelegateType = registryType.GetNestedType("HandleDelegate");
+                var handlerMethod = GetType().GetMethod(
+                    handlerMethodName,
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                if (handleDelegateType == null || handlerMethod == null)
+                {
+                    _logError?.Invoke(
+                        $"[Voice] the host automation item shape changed; the action [{id}] was not registered.",
+                        null);
+                    return;
+                }
+
+                var handle = Delegate.CreateDelegate(handleDelegateType, this, handlerMethod);
+                registryType.GetField("Handle")?.SetValue(info, handle);
+
+                actions[id] = info;
+                _log?.Invoke("[Voice] registered the automation action: " + name);
+            }
+            catch (Exception ex)
+            {
+                _logError?.Invoke(
+                    $"[Voice] failed to register the automation action [{id}].",
+                    ex);
+            }
+        }
+
+        /// <summary>
+        /// 写入宿主注册项的 SettingsType。
+        /// <para>
+        /// 该属性在宿主里是 <c>public Type SettingsType {{ get; internal set; }}</c>，
+        /// 只能靠反射写。属性被改名/移除，或宿主把它改成只读，都意味着这一项在
+        /// 宿主的自动化设置页里没有设置面板——明确报错并放弃登记，而不是留下
+        /// SettingsType 为 null 的半成品条目（原实现用 <c>?.</c> 静默吞掉这两种情况，
+        /// 出了问题只能靠猜）。
+        /// </para>
+        /// </summary>
+        private bool TrySetSettingsType(
+            object info,
+            Type registryType,
+            Type settingsType,
+            string id)
+        {
+            var property = registryType.GetProperty(
+                "SettingsType",
+                BindingFlags.Public | BindingFlags.Instance);
+            if (property == null || !property.CanWrite)
+            {
+                _logError?.Invoke(
+                    $"[Voice] the host registry no longer accepts SettingsType; the automation item [{id}] was not registered.",
+                    null);
+                return false;
             }
 
-            var actions = GetStaticDictionary(ActionServiceTypeName, "Actions");
-            if (actions == null || actions.Contains(id)) return;
-
-            var info = Activator.CreateInstance(
-                registryType,
-                new object[] { id, name, "CogOutline" });
-            if (info == null) return;
-
-            registryType.GetProperty("SettingsType")
-                ?.SetValue(info, settingsType);
-
-            var handleDelegateType = registryType.GetNestedType("HandleDelegate");
-            var handlerMethod = GetType().GetMethod(
-                handlerMethodName,
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            if (handleDelegateType == null || handlerMethod == null) return;
-
-            var handle = Delegate.CreateDelegate(handleDelegateType, this, handlerMethod);
-            registryType.GetField("Handle")?.SetValue(info, handle);
-
-            actions[id] = info;
-            _log?.Invoke("[Voice] registered the automation action: " + name);
+            try
+            {
+                property.SetValue(info, settingsType);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logError?.Invoke(
+                    $"[Voice] failed to set SettingsType for the automation item [{id}]; it was not registered.",
+                    ex);
+                return false;
+            }
         }
 
         private void RegisterSpeakingRule()
@@ -329,37 +390,52 @@ namespace VoicePlugin
                 nameof(OnEngineRuleEvaluate));
         }
 
+        /// <summary>注册一条规则。与 <see cref="RegisterAction"/> 一样逐项独立兜异常。</summary>
         private void RegisterRule(
             string id,
             string name,
             Type settingsType,
             string handlerMethodName)
         {
-            var registryType = FindType(RuleRegistryInfoTypeName);
-            if (registryType == null) return;
+            try
+            {
+                var registryType = FindType(RuleRegistryInfoTypeName);
+                if (registryType == null) return;
 
-            var rules = GetStaticDictionary(RulesetServiceTypeName, "Rules");
-            if (rules == null || rules.Contains(id)) return;
+                var rules = GetStaticDictionary(RulesetServiceTypeName, "Rules");
+                if (rules == null || rules.Contains(id)) return;
 
-            var info = Activator.CreateInstance(
-                registryType,
-                new object[] { id, name, "CogOutline" });
-            if (info == null) return;
+                var info = Activator.CreateInstance(
+                    registryType,
+                    new object[] { id, name, "CogOutline" });
+                if (info == null) return;
 
-            registryType.GetProperty("SettingsType")
-                ?.SetValue(info, settingsType);
+                if (!TrySetSettingsType(info, registryType, settingsType, id)) return;
 
-            var handleDelegateType = registryType.GetNestedType("HandleDelegate");
-            var handlerMethod = GetType().GetMethod(
-                handlerMethodName,
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            if (handleDelegateType == null || handlerMethod == null) return;
+                var handleDelegateType = registryType.GetNestedType("HandleDelegate");
+                var handlerMethod = GetType().GetMethod(
+                    handlerMethodName,
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                if (handleDelegateType == null || handlerMethod == null)
+                {
+                    _logError?.Invoke(
+                        $"[Voice] the host automation item shape changed; the rule [{id}] was not registered.",
+                        null);
+                    return;
+                }
 
-            var handle = Delegate.CreateDelegate(handleDelegateType, this, handlerMethod);
-            registryType.GetField("Handle")?.SetValue(info, handle);
+                var handle = Delegate.CreateDelegate(handleDelegateType, this, handlerMethod);
+                registryType.GetField("Handle")?.SetValue(info, handle);
 
-            rules[id] = info;
-            _log?.Invoke("[Voice] registered the automation rule: " + name);
+                rules[id] = info;
+                _log?.Invoke("[Voice] registered the automation rule: " + name);
+            }
+            catch (Exception ex)
+            {
+                _logError?.Invoke(
+                    $"[Voice] failed to register the automation rule [{id}].",
+                    ex);
+            }
         }
 
         private void OnSwitchTtsTriggered(object settings, string guid)

@@ -12,11 +12,15 @@ namespace VoicePlugin
     /// 托盘图标右键菜单组件：在托盘菜单（宿主 App 资源的 TaskbarTrayIcon 的
     /// ContextMenu）中注入“开启/关闭自动播报”菜单项。
     /// <para>
-    /// 宿主 SDK 的 <see cref="Ink_Canvas.Plugins.ITrayService"/> 实现会把菜单项
-    /// Name 设为 "PluginTray." + id——前缀本身含点号，而 WPF 的 Name 属性
-    /// 拒绝任何含点号的字符串，因此该 API 对任意插件 id 都会抛异常
-    /// （宿主日志：…不是属性"Name"的有效值）。本组件绕开该 API，直接向
-    /// 托盘 ContextMenu 注入标准 <see cref="MenuItem"/>（纯插件侧实现）。
+    /// 为什么不用 SDK 的 <see cref="Ink_Canvas.Plugins.ITrayService"/>：
+    /// 宿主实现（<c>MainWindow_cs/MW_TrayIcon.cs</c> 的 <c>AddPluginTrayMenuItem</c>）
+    /// 把菜单项 Name 设为 <c>"PluginTray." + id</c>，而 WPF 的 Name 属性拒绝含点号的
+    /// 字符串——实测 <c>new MenuItem { Name = "PluginTray.com.icc.voice" }</c> 抛
+    /// <c>ArgumentException：…不是属性"Name"的有效值</c>。插件 id 必然含点号，
+    /// 因此 <c>AddMenuItem</c> 对任何插件都返回 false，托盘项永远出不来。
+    /// 本组件于是直接向托盘 ContextMenu 注入标准 <see cref="MenuItem"/>，
+    /// 插入位置与宿主自己的实现保持一致（“重启程序”之前）。
+    /// 上游若修掉这个 Name 前缀，可以改回 ITrayService。
     /// </para>
     /// <para>
     /// 所有访问托盘 UI 的操作都派发到 UI 线程；注入内容带 Tag 标记去重；

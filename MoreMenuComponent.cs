@@ -246,9 +246,10 @@ namespace VoicePlugin
 
             allItems.Add(info);
 
-            // 给宿主 Strings.KeyDict 补一个键：使菜单项的显示名解析
-            // （Strings.GetString 返回 null 时 DisplayName 回退为
-            // LocalizationKey 本身），而不是显示 "#key:播报截断"。
+            // 给宿主 Strings.KeyDict 补一个键。宿主 Strings.GetString 对 KeyDict
+            // 里没有的键直接返回 "#key:<键>"，补上之后才会走资源查找；而映射到的
+            // 那个资源并不存在，查找返回 null，显示名于是回退为 LocalizationKey
+            // 本身（“播报截断”），而不是 "#key:播报截断"。
             PatchStringsKeyDict();
 
             _log?.Invoke("[Voice] registered the truncate menu item into ToolsMenuRegistry.");
@@ -267,8 +268,9 @@ namespace VoicePlugin
                     ?.GetValue(null) as IDictionary;
                 if (keyDict == null || keyDict.Contains(MenuItemName)) return;
 
-                // 映射到 (FloatingBarStrings, 播报截断)：资源查找必然返回 null，
-                // 于是 DisplayName 的 ?? LocalizationKey 回退到“播报截断”。
+                // 映射到 (FloatingBarStrings, 播报截断)：该资源键在
+                // FloatingBarStrings 里并不存在，Lookup 返回 null，于是
+                // DisplayName 的 ?? LocalizationKey 回退到“播报截断”。
                 keyDict.Add(
                     MenuItemName,
                     ValueTuple.Create("FloatingBarStrings", MenuItemName));
